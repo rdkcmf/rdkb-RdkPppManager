@@ -42,6 +42,7 @@
 #define PPP_IF_SERVICE_NAME "atm0.0.0.38"
 #define PPP_IF_NAME         "pppoa0"
 #define WAN_IF_NAME         "wan0"
+#define PPPoE_VLAN_IF_NAME  "vlan101"
 #define GET_PPPID_ATTEMPT 5
 
 extern char g_Subsystem[32];
@@ -863,6 +864,17 @@ Interface_GetParamUlongValue
 
         retStatus = TRUE;
     }
+
+    if( AnscEqualString(ParamName, "X_RDK_LinkType", TRUE))
+    {
+        /* collect value */
+        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+
+        *puLong = pEntry->Cfg.LinkType;
+
+        retStatus = TRUE;
+    }
+
     pthread_mutex_unlock(&pEntry->mDataMutex);
 
     return retStatus;
@@ -1012,6 +1024,7 @@ Interface_SetParamBoolValue
     PDML_PPP_IF_FULL           pEntry                  = (PDML_PPP_IF_FULL)pContextLinkObject->hContext;
 
     char command[1024] = { 0 };
+    char config_command[1024] = { 0 };
     char service_name[256] = { 0 };
     char auth_proto[8] = { 0 };
     pthread_t pppdThreadId;
@@ -1056,9 +1069,40 @@ Interface_SetParamBoolValue
                     /* support for mschap */
                     sprintf(auth_proto,"4");
                 }
-                snprintf(command, sizeof(command), "pppd -6 -c %s -a %s -u %s -p %s -f %s &",
+                if (pEntry->Cfg.LinkType == DML_PPPoA_LINK_TYPE)
+                {
+            #ifdef USE_PPP_DAEMON
+                    snprintf(command, sizeof(command), "pppd -6 -c %s -a %s -u %s -p %s -f %s &",
                         pEntry->Cfg.Alias, pEntry->Info.InterfaceServiceName, pEntry->Cfg.Username,
                         pEntry->Cfg.Password, auth_proto);
+            #else
+                    /* Assume a default rp-pppoe config exist. Update rp-pppoe configuration */
+                    snprintf(config_command, sizeof(config_command), "pppoe_config.sh %s %s %s %s PPPoA", 
+                        pEntry->Cfg.Username, pEntry->Cfg.Password, pEntry->Info.InterfaceServiceName, pEntry->Cfg.Alias);
+
+                    system(config_command);
+
+                    /* start rp-pppoe */
+                    snprintf(command, sizeof(command), "/usr/sbin/pppoe-start");
+            #endif
+                
+                }
+                else if (pEntry->Cfg.LinkType == DML_PPPoE_LINK_TYPE)
+                {
+            #ifdef USE_PPP_DAEMON
+                    snprintf(command, sizeof(command), "pppd -6 -c %s -i %s -u %s -p %s -f %s &",
+                        pEntry->Cfg.Alias, PPPoE_VLAN_IF_NAME, pEntry->Cfg.Username, pEntry->Cfg.Password, auth_proto);
+            #else
+                    /* Assume a defule rp-pppoe config exist. Update rp-pppoe configuration */
+                    snprintf(config_command, sizeof(config_command), "pppoe_config.sh %s %s %s %s PPPoE", 
+                        pEntry->Cfg.Username, pEntry->Cfg.Password, PPPoE_VLAN_IF_NAME, pEntry->Cfg.Alias);
+
+                    system(config_command);
+
+                    /* start rp-pppoe */
+                    snprintf(command, sizeof(command), "/usr/sbin/pppoe-start");
+            #endif
+                }
                 CcspTraceInfo(("parameters were set\n"));
             }
             else
@@ -1256,7 +1300,7 @@ Interface_SetParamUlongValue
     )
 {
     PPPP_IF_LINK_OBJECT       pContextLinkObject      = (PPPP_IF_LINK_OBJECT)hInsContext;
-    PDML_PPP_IF_FULL           pEntry                  = (PDML_PPP_IF_FULL)pContextLinkObject->hContext;
+    PDML_PPP_IF_FULL          pEntry                  = (PDML_PPP_IF_FULL)pContextLinkObject->hContext;
     BOOL retStatus = FALSE;
 
     if(pEntry == NULL)
@@ -1320,6 +1364,14 @@ Interface_SetParamUlongValue
 
         retStatus = TRUE;
     }
+
+    if( AnscEqualString(ParamName, "X_RDK_LinkType", TRUE))
+    {
+        pEntry->Cfg.LinkType = uValue;
+
+        retStatus = TRUE;
+    }
+
     pthread_mutex_unlock(&pEntry->mDataMutex);
 
     return retStatus;

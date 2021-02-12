@@ -67,16 +67,8 @@ DML_IF_STATS, *PDML_IF_STATS;
 
 typedef  enum _PPP_DML_LINK_TYPE
 {
-    DML_PPP_LINK_TYPE_Eth       = 1,
-    DML_PPP_LINK_TYPE_EthVlan,
-    DML_PPP_LINK_TYPE_Usb,
-    DML_PPP_LINK_TYPE_Hpna,
-    DML_PPP_LINK_TYPE_Moca,
-    DML_PPP_LINK_TYPE_HomePlug,
-    DML_PPP_LINK_TYPE_Upa,
-    DML_PPP_LINK_TYPE_WiFiSsid,
-    DML_PPP_LINK_TYPE_Bridge,
-    DML_PPP_LINK_TYPE_PPP
+    DML_PPPoA_LINK_TYPE       = 1,
+    DML_PPPoE_LINK_TYPE
 }
 PPP_DML_LINK_TYPE, *PPPP_DML_LINK_TYPE;
 
@@ -114,7 +106,7 @@ typedef  struct _DML_PPP_IF_CFG
     BOOLEAN                         bEnabled;
     BOOLEAN                         bIPCPEnabled;
     BOOLEAN                         bIPV6CPEnabled;
-    PPP_DML_LINK_TYPE          LinkType;       /* LinkType/LinkName constitutes LowerLayers */
+    PPP_DML_LINK_TYPE               LinkType;
     char                            LowerLayers[256];
     char                            LinkName[DML_IF_NAME_LENGTH];
     ULONG                           AutoDisconnectTime;

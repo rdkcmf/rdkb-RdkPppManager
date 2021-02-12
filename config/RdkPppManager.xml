@@ -195,6 +195,12 @@ limitations under the License.
               <writable>true</writable>
             </parameter>
             <parameter>
+              <name>X_RDK_LinkType</name>
+              <type>string: PPPoA(1),PPPoE(2)</type>
+              <syntax>uint32/mapped</syntax>
+              <writable>true</writable>
+            </parameter>
+            <parameter>
               <name>LCPEcho</name>
               <type>unsignedInt</type>
               <syntax>uint32</syntax>
