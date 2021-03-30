@@ -48,7 +48,7 @@ static ANSC_STATUS PppMgr_createIpcSockFd( int32_t  *sockFd, uint32_t sockMode);
 static ANSC_STATUS  PppMgr_bindIpcSocket( int32_t sockFd);
 static void* PppMgr_IpcServerThread( void *arg );
 static ANSC_STATUS PppMgr_IpcServerInit();
-static PSINGLE_LINK_ENTRY PppMgr_DmlGetLinkEntry(pid_t pid);
+static PSINGLE_LINK_ENTRY PppMgr_DmlGetLinkEntry(pid_t pid, char *interface);
 static ANSC_STATUS PppMgr_DmlSetIp4Param (char * ipbuff, char * ipCharArr);
 static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_event_msg_t pppEventMsg);
 static ANSC_STATUS PppMgr_receiveIpcSocket(int32_t sockFd, char *msg, uint32_t *msgLen);
@@ -682,7 +682,7 @@ static ANSC_STATUS PppMgr_ProcessIpcMsg(ipc_msg_payload_t ipcMsg)
         {
             sleep(1);
         }
-        pSLinkEntry = PppMgr_DmlGetLinkEntry(ipcMsg.data.pppEventMsg.pid);
+        pSLinkEntry = PppMgr_DmlGetLinkEntry(ipcMsg.data.pppEventMsg.pid, ipcMsg.data.pppEventMsg.interface);
     
         getAttempt++;
 
@@ -840,7 +840,7 @@ Function : PppGetInstanceNumber
 
 Decription: This API will return data model entry associated with ppp client pid value
 -----------------------------------------------------------------------*/
-static PSINGLE_LINK_ENTRY PppMgr_DmlGetLinkEntry(pid_t pid)
+static PSINGLE_LINK_ENTRY PppMgr_DmlGetLinkEntry(pid_t pid, char *interface)
 {
 
     PSINGLE_LINK_ENTRY         pSLinkEntry             = NULL;
@@ -870,6 +870,16 @@ static PSINGLE_LINK_ENTRY PppMgr_DmlGetLinkEntry(pid_t pid)
             {
                 pthread_mutex_unlock(&pNewEntry->mDataMutex);
 
+                return pSLinkEntry;
+            }
+            else if (strncmp(pNewEntry->Cfg.Alias, interface, sizeof(pNewEntry->Cfg.Alias)) == 0)
+            {
+                /* The mapping using PID may not work in some cases. For eg, if pppd
+                restarts due to CHAP authentication failure etc. In this case, we should
+                try to map with interface name and update the PID information */
+                pNewEntry->Info.pppPid = PppMgr_getPppPid();
+                CcspTraceInfo(("[%s-%d] ppp daemon on %s interface may be restarted and updating new pid %d", __FUNCTION__, __LINE__, pNewEntry->Cfg.Alias, pNewEntry->Info.pppPid));
+                pthread_mutex_unlock(&pNewEntry->mDataMutex);
                 return pSLinkEntry;
             }
             pthread_mutex_unlock(&pNewEntry->mDataMutex);
