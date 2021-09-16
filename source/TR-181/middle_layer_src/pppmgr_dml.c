@@ -260,27 +260,27 @@ PPP_GetParamStringValue
 
         if (flag & DML_PPP_SUPPORTED_NCP_ATCP)
         {
-            AnscCatString(pValue, "ATCP,");
+            strncat(pValue, "ATCP,",sizeof("ATCP,"));
         }
 
         if (flag & DML_PPP_SUPPORTED_NCP_IPCP)
         {
-            AnscCatString(pValue, "IPCP,");
+            strncat(pValue, "IPCP,",sizeof("IPCP,"));
         }
 
         if (flag & DML_PPP_SUPPORTED_NCP_IPXCP)
         {
-            AnscCatString(pValue, "IPXCP,");
+            strncat(pValue, "IPXCP,",sizeof("IPXCP,"));
         }
 
         if (flag & DML_PPP_SUPPORTED_NCP_NBFCP)
         {
-            AnscCatString(pValue, "NBFCP,");
+            strncat(pValue, "NBFCP,",sizeof("NBFCP,"));
         }
 
         if (flag & DML_PPP_SUPPORTED_NCP_IPv6CP)
         {
-            AnscCatString(pValue, "IPv6CP,");
+            strncat(pValue, "IPv6CP,",sizeof("IPv6CP,"));
         }
 
         return 0;
@@ -464,9 +464,9 @@ Interface_AddEntry
 
     sprintf(pEntry->Cfg.Alias, "erouter%d", pMyObject->ulIfNextInstance);
 
-    strcpy(pEntry->Info.InterfaceServiceName, PPP_IF_SERVICE_NAME);
+    strncpy(pEntry->Info.InterfaceServiceName, PPP_IF_SERVICE_NAME,sizeof(pEntry->Info.InterfaceServiceName));
 
-    strcpy(pEntry->Info.Name, PPP_IF_NAME);
+    strncpy(pEntry->Info.Name, PPP_IF_NAME,sizeof(pEntry->Info.Name));
 
     pEntry->Info.AuthenticationProtocol = DML_PPP_AUTH_CHAP;
 

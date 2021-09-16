@@ -535,10 +535,10 @@ static ANSC_STATUS PppMgr_ProcessIpcpParams(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_
 
             if(i > 1)
             {
-                strncpy(dns2, s1, sizeof(dns2));
+                strncpy(dns2, s1, sizeof(dns2)-1);
                 break;
             }
-            strncpy(dns1, s1, sizeof(dns1));
+            strncpy(dns1, s1, sizeof(dns1)-1);
         }
         if(!dnsCount || dnsCount > 2)
         {
@@ -617,14 +617,16 @@ static ANSC_STATUS PppMgr_ProcessIpv6cpParams(PDML_PPP_IF_FULL pNewEntry, ipc_pp
     {
         if(strcmp(pppEventMsg.event.pppIpv6cpMsg.localIntfId , "") != 0)
         {
+            memset(pNewEntry->Info.Ip6LocalIfID,0,sizeof(pNewEntry->Info.Ip6LocalIfID));		
             strncpy(pNewEntry->Info.Ip6LocalIfID, pppEventMsg.event.pppIpv6cpMsg.localIntfId, 
-                    sizeof(pNewEntry->Info.Ip6LocalIfID));
+                    (sizeof(pNewEntry->Info.Ip6LocalIfID)-1));
         }
 
         if(strcmp(pppEventMsg.event.pppIpv6cpMsg.remoteIntfId , "") != 0)
         {
+            memset(pNewEntry->Info.Ip6RemoteIfID,0,sizeof(pNewEntry->Info.Ip6RemoteIfID));
             strncpy(pNewEntry->Info.Ip6RemoteIfID,pppEventMsg.event.pppIpv6cpMsg.remoteIntfId, 
-                    sizeof(pNewEntry->Info.Ip6LocalIfID));
+                    (sizeof(pNewEntry->Info.Ip6LocalIfID)-1));
         }
 
         /* set wan ipv6cp status */

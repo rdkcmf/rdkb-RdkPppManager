@@ -71,7 +71,8 @@ PppGetIfAddr
     struct ifreq            ifr;
     int                     fd = 0;
 
-    strcpy(ifr.ifr_name, netdev);
+    memset(ifr.ifr_name,0,sizeof(ifr.ifr_name));
+    strncpy(ifr.ifr_name, netdev,(sizeof(ifr.ifr_name)-1));
 
     if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) >= 0)
     {
