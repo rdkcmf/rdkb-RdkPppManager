@@ -65,6 +65,12 @@
 
 #define DATAMODEL_PARAM_LENGTH    256
 
+#define PANDM_COMPONENT_NAME  "eRT.com.cisco.spvtg.ccsp.pam"
+#define PANDM_DBUS_PATH       "/com/cisco/spvtg/ccsp/pam"
+
+/* DeviceInfo Params */
+#define UP_TIME_PARAM_NAME        "Device.DeviceInfo.UpTime"
+
 #if defined(_COSA_BCM_MIPS_) || defined(_ENABLE_DSL_SUPPORT_)
 #define INTERFACE "erouter0"
 #else
@@ -105,5 +111,7 @@ ANSC_STATUS DmlWanmanagerSetParamValues( const char *pComponent, const char *pBu
         const char *pParamName, const char *pParamVal, enum dataType_e type, unsigned int bCommitFlag );
 
 static ANSC_STATUS DmlPppMgrGetParamValues(char *pComponent, char *pBus, char *pParamName, char *pReturnVal);
+
+ULONG GetUptimeinSeconds ();
 
 #endif

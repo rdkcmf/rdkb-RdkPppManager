@@ -694,3 +694,20 @@ ANSC_STATUS DmlWanmanagerSetParamValues(const char *pComponent, const char *pBus
 
     return ANSC_STATUS_SUCCESS;
 }
+
+ULONG GetUptimeinSeconds ()
+{
+    char acGetParamValue[DATAMODEL_PARAM_LENGTH] = { 0 };
+    ULONG UpTime = 0;
+
+    if(DmlPppMgrGetParamValues(PANDM_COMPONENT_NAME, PANDM_DBUS_PATH, UP_TIME_PARAM_NAME, acGetParamValue) != ANSC_STATUS_SUCCESS)
+    {
+        CcspTraceError(("%s %d Failed to get UpTime value\n", __FUNCTION__, __LINE__));
+    }
+    else
+    {
+        sscanf(acGetParamValue, "%lu", &UpTime);
+    }
+
+    return UpTime;
+}

@@ -742,7 +742,7 @@ Interface_GetParamUlongValue
         /* collect value */
         PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
-        *puLong = AnscGetTimeIntervalInSeconds(pEntry->Info.LastChange, AnscGetTickInSeconds());
+        *puLong = AnscGetTimeIntervalInSeconds(pEntry->Info.LastChange, GetUptimeinSeconds());
 
         retStatus = TRUE;
     }

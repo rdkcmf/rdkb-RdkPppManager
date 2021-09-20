@@ -370,16 +370,19 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Unconfigured;
             snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Down");
             updatedParam = 1;
+            pNewEntry->Info.LastChange = GetUptimeinSeconds();
             break;
 
         case PPP_INTERFACE_CONNECTING:
             pNewEntry->Info.Status = DML_IF_STATUS_Down;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Connecting;
+            pNewEntry->Info.LastChange = GetUptimeinSeconds();
             break;
 
         case PPP_INTERFACE_AUTHENTICATING:
             pNewEntry->Info.Status = DML_IF_STATUS_Down;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Authenticating;
+            pNewEntry->Info.LastChange = GetUptimeinSeconds();
             break;
 
         case PPP_INTERFACE_UP:
@@ -387,11 +390,13 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Connected;
             snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Up");
             updatedParam = 1;
+            pNewEntry->Info.LastChange = GetUptimeinSeconds();
             break;
 
         case PPP_INTERFACE_DISCONNECTING:
             pNewEntry->Info.Status = DML_IF_STATUS_Down;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Disconnecting;
+            pNewEntry->Info.LastChange = GetUptimeinSeconds();
             break;
 
         case PPP_INTERFACE_DISCONNECTED:
@@ -400,6 +405,7 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Disconnected;
             snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Down");
             updatedParam = 1;
+            pNewEntry->Info.LastChange = GetUptimeinSeconds();
             break;
 
         default:
@@ -407,6 +413,7 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Disconnected;
             snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Down");
             updatedParam = 1;
+            pNewEntry->Info.LastChange = GetUptimeinSeconds();
             break;
     }
     /* We updated params in ppp data model . Update wan data model */
