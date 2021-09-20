@@ -180,7 +180,7 @@ limitations under the License.
             </parameter>
             <parameter>
               <name>MaxMRUSize</name>
-              <type>unsignedInt[1:1540]</type>
+              <type>unsignedInt[1280:1500]</type>
               <syntax>uint32</syntax>
               <writable>true</writable>
             </parameter>

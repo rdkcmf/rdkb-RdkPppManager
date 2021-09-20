@@ -53,6 +53,22 @@ extern cap_user appcaps;
 extern PBACKEND_MANAGER_OBJECT               g_pBEManager;
 static void* PppMgr_StartPppdDaemon( void *arg );
 
+static int set_syscfg(char *pValue,char *param)
+{
+    if((syscfg_set(NULL, param, pValue) != 0))
+    {
+        return -1;
+    }
+    else
+    {
+        if(syscfg_commit() != 0)
+        {
+            return -1;
+        }
+        return 0;
+    }
+}
+
 /***********************************************************************
 
  APIs for Object:
@@ -724,6 +740,7 @@ Interface_GetParamUlongValue
     PPPP_IF_LINK_OBJECT       pContextLinkObject      = (PPPP_IF_LINK_OBJECT)hInsContext;
     PDML_PPP_IF_FULL           pEntry                  = (PDML_PPP_IF_FULL)pContextLinkObject->hContext;
     BOOL retStatus = FALSE;
+    char buff[10] = {0};
 
     pthread_mutex_lock(&pEntry->mDataMutex);
     /* check the parameter name and return the corresponding value */
@@ -824,6 +841,8 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "MaxMRUSize", TRUE))
     {
         /* collect value */
+        syscfg_get(NULL, "MaxMRUSize",buff, sizeof(buff));
+        pEntry->Cfg.MaxMRUSize = atoi(buff);
         *puLong = pEntry->Cfg.MaxMRUSize;
 
         retStatus = TRUE;
@@ -834,6 +853,7 @@ Interface_GetParamUlongValue
         /* collect value */
         PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
+        pEntry->Info.CurrentMRUSize = pEntry->Cfg.MaxMRUSize;
         *puLong = pEntry->Info.CurrentMRUSize;
 
         retStatus = TRUE;
@@ -1328,6 +1348,7 @@ Interface_SetParamUlongValue
     PPPP_IF_LINK_OBJECT       pContextLinkObject      = (PPPP_IF_LINK_OBJECT)hInsContext;
     PDML_PPP_IF_FULL          pEntry                  = (PDML_PPP_IF_FULL)pContextLinkObject->hContext;
     BOOL retStatus = FALSE;
+    char buf[10] = {0};
 
     if(pEntry == NULL)
     {
@@ -1369,7 +1390,9 @@ Interface_SetParamUlongValue
         retStatus = FALSE;
 #else
         pEntry->Cfg.MaxMRUSize = uValue;
-        
+        snprintf(buf,sizeof(buf),"%d",uValue);
+        set_syscfg(buf,"MaxMRUSize");
+
         retStatus = TRUE;
 #endif
     }
