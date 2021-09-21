@@ -91,7 +91,7 @@ ANSC_STATUS PppDmlDelIfEntry( ANSC_HANDLE hContext, ULONG ulInstanceNumber );
 
 ANSC_STATUS PppDmlSetIfCfg    ( ANSC_HANDLE hContext, PDML_PPP_IF_CFG pCfg );
 
-ANSC_STATUS PppDmlGetIfStats ( ANSC_HANDLE hContext, ULONG ulPppIfInstanceNumber, PDML_IF_STATS pStats );
+ANSC_STATUS PppDmlGetIfStats ( ANSC_HANDLE hContext, ULONG ulPppIfInstanceNumber, PDML_IF_STATS pStats, PDML_PPP_IF_FULL pEntry );
 
 ANSC_STATUS PppDmlIfReset( ANSC_HANDLE hContext, ULONG ulInstanceNumber );
 

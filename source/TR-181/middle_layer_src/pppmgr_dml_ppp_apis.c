@@ -40,6 +40,9 @@
 #define PPP_LCPEcho 30
 #define PPP_LCPEchoRetry 3
 
+#define NET_STATS_FILE "/proc/net/dev"
+
+static int CosaUtilGetIfStats(char *ifname, PDML_IF_STATS pStats);
 extern char g_Subsystem[32];
 extern ANSC_HANDLE bus_handle;
 
@@ -69,9 +72,15 @@ PppDmlGetIfStats
     (
         ANSC_HANDLE                 hContext,
         ULONG                       ulPppIfInstanceNumber,
-        PDML_IF_STATS          pStats
+        PDML_IF_STATS               pStats,
+        PDML_PPP_IF_FULL            pEntry
 )
 {
+    char wan_interface[10] = {0};
+
+    AnscCopyString(wan_interface, pEntry->Cfg.Alias);
+    CosaUtilGetIfStats(wan_interface,pStats);
+
     return ANSC_STATUS_SUCCESS;
 }
 
@@ -720,4 +729,48 @@ ULONG GetUptimeinSeconds ()
     }
 
     return UpTime;
+}
+
+static int CosaUtilGetIfStats(char *ifname, PDML_IF_STATS pStats)
+{
+    int    i;
+    FILE *fp;
+    char buf[1024] = {0} ;
+    char *p;
+    int    ret = 0;
+
+    if (ifname == NULL)
+        return -1;
+
+    fp = fopen(NET_STATS_FILE, "r");
+
+    if(fp)
+    {
+        i = 0;
+        while(fgets(buf, sizeof(buf), fp))
+        {
+            if(++i <= 2)
+                continue;
+            if(p = strchr(buf, ':'))
+            {
+                if(strstr(buf, ifname))
+                {
+                    memset(pStats, 0, sizeof(*pStats));
+                    if (sscanf(p+1, "%d %d %d %d %*d %*d %*d %*d %d %d %d %d %*d %*d %*d %*d",
+                    &pStats->BytesReceived, &pStats->PacketsReceived, &pStats->ErrorsReceived,
+                    &pStats->DiscardPacketsReceived,&pStats->BytesSent, &pStats->PacketsSent,
+                    &pStats->ErrorsSent, &pStats->DiscardPacketsSent) == 8)
+                    {
+                        ret = 1;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (fp != NULL)
+        fclose(fp);
+
+    return ret;
 }

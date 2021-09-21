@@ -3017,7 +3017,7 @@ Stats_GetParamUlongValue
     DML_IF_STATS               Stats = {0};
     BOOL retStatus = FALSE;
 
-    PppDmlGetIfStats(NULL, pEntry->Cfg.InstanceNumber, &Stats);
+    PppDmlGetIfStats(NULL, pEntry->Cfg.InstanceNumber, &Stats, pEntry);
 
     pthread_mutex_lock(&pEntry->mDataMutex);
     /* check the parameter name and return the corresponding value */
