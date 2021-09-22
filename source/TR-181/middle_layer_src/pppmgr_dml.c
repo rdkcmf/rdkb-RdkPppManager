@@ -745,7 +745,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "Status", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.Status;
 
@@ -755,7 +755,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "LastChange", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = AnscGetTimeIntervalInSeconds(pEntry->Info.LastChange, GetUptimeinSeconds());
 
@@ -765,7 +765,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "ConnectionStatus", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.ConnectionStatus;
 
@@ -791,7 +791,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "LastConnectionError", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.LastConnectionError;
 
@@ -825,7 +825,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "EncryptionProtocol", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.EncryptionProtocol;
 
@@ -835,7 +835,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "CompressionProtocol", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.CompressionProtocol;
 
@@ -845,7 +845,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "AuthenticationProtocol", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.AuthenticationProtocol;
 
@@ -865,7 +865,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "CurrentMRUSize", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         pEntry->Info.CurrentMRUSize = pEntry->Cfg.MaxMRUSize;
         *puLong = pEntry->Info.CurrentMRUSize;
@@ -884,7 +884,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "LCPEcho", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.LCPEcho;
 
@@ -894,7 +894,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "LCPEchoRetry", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.LCPEchoRetry;
 
@@ -904,7 +904,7 @@ Interface_GetParamUlongValue
     if( AnscEqualString(ParamName, "X_RDK_LinkType", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Cfg.LinkType;
 
@@ -982,7 +982,7 @@ Interface_GetParamStringValue
     if( AnscEqualString(ParamName, "Name", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         AnscCopyString(pValue, pEntry->Info.Name);
 
@@ -1837,7 +1837,7 @@ PPPoE_GetParamUlongValue
     if( AnscEqualString(ParamName, "SessionID", TRUE))
     {
         /* collect value */
-        PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+        PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
 
         *puLong = pEntry->Info.SessionID;
 
@@ -2465,7 +2465,7 @@ IPCP_GetParamStringValue
 
     pthread_mutex_lock(&pEntry->mDataMutex);
 
-    PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+    PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
     /* check the parameter name and return the corresponding value */
     if( AnscEqualString(ParamName, "LocalIPAddress", TRUE))
     {
@@ -2945,7 +2945,7 @@ IPv6CP_GetParamStringValue
     
     pthread_mutex_lock(&pEntry->mDataMutex);
 
-    PPPDmlGetIfInfo(NULL, pEntry->Cfg.InstanceNumber, &pEntry->Info);
+    PPPDmlGetIfInfo(pContextLinkObject->hContext, pEntry->Cfg.InstanceNumber, &pEntry->Info);
     /* check the parameter name and return the corresponding value */
     if( AnscEqualString(ParamName, "LocalInterfaceIdentifier", TRUE))
     {

@@ -100,6 +100,8 @@ PPPDmlGetIfInfo
     pInfo->LCPEchoRetry = PPP_LCPEchoRetry;
     pInfo->LCPEcho      = PPP_LCPEcho;
 
+    pInfo->SessionID    = 0;
+    get_session_id(&pInfo->SessionID, hContext);
     return ANSC_STATUS_SUCCESS;
 }
 
