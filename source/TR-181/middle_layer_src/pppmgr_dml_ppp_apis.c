@@ -37,6 +37,9 @@
 #include "pppmgr_dml_ppp_apis.h"
 #include "pppmgr_dml.h"
 
+#define PPP_LCPEcho 30
+#define PPP_LCPEchoRetry 3
+
 extern char g_Subsystem[32];
 extern ANSC_HANDLE bus_handle;
 
@@ -80,6 +83,13 @@ PPPDmlGetIfInfo
         PDML_PPP_IF_INFO       pInfo
     )
 {
+    if ( pInfo == NULL )
+    {
+        return ANSC_STATUS_FAILURE;
+    }
+
+    pInfo->LCPEchoRetry = PPP_LCPEchoRetry;
+    pInfo->LCPEcho      = PPP_LCPEcho;
 
     return ANSC_STATUS_SUCCESS;
 }
