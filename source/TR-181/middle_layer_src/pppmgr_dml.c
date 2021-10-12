@@ -774,6 +774,22 @@ Interface_GetParamUlongValue
         retStatus = TRUE;
     }
 
+    if( AnscEqualString(ParamName, "X_T_ONLINE_DE_SRU", TRUE))
+    {
+
+        *puLong =  pEntry->Info.SRU;
+
+        retStatus = TRUE;
+    }
+
+    if( AnscEqualString(ParamName, "X_T_ONLINE_DE_SRD", TRUE))
+    {
+
+        *puLong =  pEntry->Info.SRD;
+
+        retStatus = TRUE;
+    }
+
     if( AnscEqualString(ParamName, "LastConnectionError", TRUE))
     {
         /* collect value */

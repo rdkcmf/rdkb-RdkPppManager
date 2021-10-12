@@ -191,6 +191,16 @@ limitations under the License.
               <notify>off</notify>
             </parameter>
             <parameter>
+              <name>X_T_ONLINE_DE_SRU</name>
+              <type>unsignedInt</type>
+              <syntax>uint32</syntax>
+            </parameter>
+            <parameter>
+              <name>X_T_ONLINE_DE_SRD</name>
+              <type>unsignedInt</type>
+              <syntax>uint32</syntax>
+            </parameter>
+            <parameter>
               <name>ConnectionTrigger</name>
               <type>string: OnDemand(1),AlwaysOn(2),Manual(3)</type>
               <syntax>uint32/mapped</syntax>

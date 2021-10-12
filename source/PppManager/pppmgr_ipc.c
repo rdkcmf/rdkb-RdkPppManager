@@ -35,6 +35,7 @@
 /* ---- Include Files ---------------------------------------- */
 #include <sys/un.h>
 #include <errno.h>
+#include <regex.h>
 #include "pppmgr_ssp_global.h"
 #include "pppmgr_dml_plugin_main_apis.h"
 #include "pppmgr_dml.h"
@@ -43,6 +44,14 @@
 
 #define PPP_MGR_IPC_SERVER    1
 #define GET_PPPID_ATTEMPT    5
+
+/* pppd exit status */
+#define PPP_EXIT_USER_REQUEST        5
+#define PPP_EXIT_PEER_AUTH_FAILED    11
+#define PPP_EXIT_IDLE_TIMEOUT        12
+#define PPP_EXIT_HANGUP              16
+#define PPP_EXIT_AUTH_TOPEER_FAILED  19
+
 /* ---- private Functions ------------------------------------ */
 static ANSC_STATUS PppMgr_createIpcSockFd( int32_t  *sockFd, uint32_t sockMode);
 static ANSC_STATUS  PppMgr_bindIpcSocket( int32_t sockFd);
@@ -82,6 +91,7 @@ static char *pppStateNames[] =
     [PPP_IPCP_FAILED] = "PPP_IPCP_FAILED",
     [PPP_IPV6CP_COMPLETED] = "PPP_IPV6CP_COMPLETED",
     [PPP_IPV6CP_FAILED] = "PPP_IPV6CP_FAILED",
+    [PPP_LCP_AUTH_COMPLETED] = "PPP_LCP_AUTH_COMPLETED",
     [PPP_MAX_STATE] = "PPP_MAX_STATE"
 
 };
@@ -329,6 +339,68 @@ static ANSC_STATUS PppMgr_DmlSetIp4Param (char * ipbuff, char * ipCharArr)
 }
 
 /* --------------------------------------------------------------------
+Function : PppMgr_DmlSetVendorParams
+
+Decription: This API will set vendor parameters to data model
+-----------------------------------------------------------------------*/
+
+static ANSC_STATUS PppMgr_DmlSetVendorParams(char *invendormsg , int *SRU , int *SRD)
+{
+    char * source = NULL;
+    source = invendormsg;
+    char * regexString = "([A-Z]+)=([0-9]+)";
+    size_t maxMatches = 2; // No. of Strings matching pattern to extract
+    size_t maxGroups = 1;
+
+    regex_t regexCompiled;
+    regmatch_t groupArray[maxGroups];
+    unsigned int m;
+    char * cursor;
+
+    if(regcomp(&regexCompiled, regexString, REG_EXTENDED))
+    {
+        CcspTraceInfo(("%s %d Could not compile regex \n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    m = 0;
+    cursor = source; // pointing to beginning of string
+    for(m = 0; m < maxMatches; m ++)
+    {
+        if(regexec(&regexCompiled, cursor, maxGroups, groupArray, 0))
+            break;  // No more matches
+
+        unsigned int g = 0;
+        unsigned int offset = 0;
+        for(g = 0; g < maxGroups; g++)
+        {
+            if(groupArray[g].rm_so == (size_t)-1)
+                break;  // No more groups
+
+            if(g == 0)
+                offset = groupArray[g].rm_eo;
+
+            char cursorCopy[strlen(cursor) + 1];
+            strcpy(cursorCopy, cursor);
+            cursorCopy[groupArray[g].rm_eo] = 0;
+            char *ret;
+            if(ret = strstr(cursorCopy + groupArray[g].rm_so, "SRU="))
+            {
+                *SRU = atoi(ret+4);
+            }
+            else if(ret = strstr(cursorCopy + groupArray[g].rm_so, "SRD="))
+            {
+                *SRD = atoi(ret+4);
+            }
+        }
+        cursor += offset;
+    }
+    regfree(&regexCompiled);
+
+    return ANSC_STATUS_SUCCESS;
+}
+
+/* --------------------------------------------------------------------
 Function : PppMgr_ProcessStateChangedMsg
 
 Decription: This API will set ppp state when LCP state change message is received
@@ -341,6 +413,7 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
     INT instance_num = 0;
     INT iWANInstance = -1;
     uint32_t updatedParam = 0;
+    int ret = 0;
 
     CcspTraceInfo(("[%s-%d] - PID received %d\n", __FUNCTION__, __LINE__, pppEventMsg.pid));
 
@@ -377,6 +450,7 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
             pNewEntry->Info.Status = DML_IF_STATUS_Down;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Connecting;
             pNewEntry->Info.LastChange = GetUptimeinSeconds();
+            strncpy(pNewEntry->Cfg.ACName,pppEventMsg.event.pppLcpMsg.acname,sizeof(pNewEntry->Cfg.ACName));
             break;
 
         case PPP_INTERFACE_AUTHENTICATING:
@@ -388,6 +462,7 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
         case PPP_INTERFACE_UP:
             pNewEntry->Info.Status = DML_IF_STATUS_Up;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Connected;
+            pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_NONE;
             snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Up");
             updatedParam = 1;
             pNewEntry->Info.LastChange = GetUptimeinSeconds();
@@ -401,11 +476,58 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
 
         case PPP_INTERFACE_DISCONNECTED:
         case PPP_INTERFACE_DOWN:
+            pNewEntry->Info.SRU = 0;
+            pNewEntry->Info.SRD = 0;
             pNewEntry->Info.Status = DML_IF_STATUS_Down;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Disconnected;
             snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Down");
             updatedParam = 1;
             pNewEntry->Info.LastChange = GetUptimeinSeconds();
+
+            switch(pppEventMsg.event.pppLcpMsg.exitStatus)
+            {
+                case PPP_EXIT_USER_REQUEST:
+                    pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_USER_DISCONNECT;
+                    break;
+                case PPP_EXIT_PEER_AUTH_FAILED:
+                case PPP_EXIT_AUTH_TOPEER_FAILED:
+                    pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_AUTHENTICATION_FAILURE;
+                    break;
+                case PPP_EXIT_HANGUP:
+                    pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_ISP_TIME_OUT;
+                    break;
+                default:
+                    pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_UNKNOWN;
+                    break;
+            }
+
+            break;
+
+	    case PPP_LCP_AUTH_COMPLETED:
+            pNewEntry->Info.SRU = 0;
+            pNewEntry->Info.SRD = 0;
+
+            if(strlen(pppEventMsg.event.pppLcpMsg.vendormsg) > 0)
+            {
+                ret = PppMgr_DmlSetVendorParams(pppEventMsg.event.pppLcpMsg.vendormsg,
+                (int *)&pNewEntry->Info.SRU, (int *)&pNewEntry->Info.SRD);
+
+                if(ret == ANSC_STATUS_FAILURE)
+                {
+                    CcspTraceInfo(("[%s-%d] Setting Vendor Params Falure%s\n", __FUNCTION__, __LINE__,
+                    pppEventMsg.event.pppLcpMsg.vendormsg));
+                }
+            }
+
+            if(strlen(pppEventMsg.event.pppLcpMsg.authproto) > 0)
+            {
+                CcspTraceInfo(("PPP Authentication Protocol: %s ", pppEventMsg.event.pppLcpMsg.authproto));
+                if(strcmp(pppEventMsg.event.pppLcpMsg.authproto, "PAP") == 0)
+                    pNewEntry->Info.AuthenticationProtocol = DML_PPP_AUTH_PAP;
+                else
+                    pNewEntry->Info.AuthenticationProtocol = DML_PPP_AUTH_CHAP;
+            }
+
             break;
 
         default:
@@ -736,6 +858,7 @@ static ANSC_STATUS PppMgr_ProcessIpcMsg(ipc_msg_payload_t ipcMsg)
         case    PPP_INTERFACE_DISCONNECTED:
         case    PPP_INTERFACE_LCP_ECHO_FAILED:
         case    PPP_INTERFACE_AUTH_FAILED:
+        case    PPP_LCP_AUTH_COMPLETED:
 
             CcspTraceInfo(("[%s-%d] PPP_LCP_STATE_CHANGED message received\n", __FUNCTION__, __LINE__));
 

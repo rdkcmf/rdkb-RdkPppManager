@@ -219,6 +219,8 @@ typedef  struct _DML_PPP_IF_INFO
     ANSC_IPV4_ADDRESS               LocalIPAddress;
     ANSC_IPV4_ADDRESS               RemoteIPAddress;
     ANSC_IPV4_ADDRESS               DNSServers[2];
+    ULONG                           SRU;
+    ULONG                           SRD;
     char                            Ip6LocalIfID[46];
     char                            Ip6RemoteIfID[46];
 }
