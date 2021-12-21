@@ -38,7 +38,6 @@
 #include "pppmgr_dml_apis.h"
 #include "pppmgr_dml_ppp_apis.h"
 #include "ccsp_psm_helper.h"
-#include "cap.h"
 
 #define PPP_IF_SERVICE_NAME "atm0.0.0.38"
 #define PPP_IF_NAME         "pppoa0"
@@ -48,7 +47,6 @@
 
 extern char g_Subsystem[32];
 extern ANSC_HANDLE bus_handle;
-extern cap_user appcaps;
 
 extern PBACKEND_MANAGER_OBJECT               g_pBEManager;
 static void* PppMgr_StartPppdDaemon( void *arg );
@@ -1068,7 +1066,6 @@ Interface_SetParamBoolValue
     pthread_t pppdThreadId;
     BOOL retStatus = FALSE;
     uint32_t getAttempts = 0;
-    bool bNonrootEnabled = false;
 
     if(pEntry == NULL)
     {
@@ -1110,8 +1107,6 @@ Interface_SetParamBoolValue
                 }
                 if (pEntry->Cfg.LinkType == DML_PPPoA_LINK_TYPE)
                 {
-		    gain_root_privilege();
-		    bNonrootEnabled = true;
             #ifdef USE_PPP_DAEMON
                     snprintf(command, sizeof(command), "pppd -6 -c %s -a %s -u %s -p %s -f %s &",
                         pEntry->Cfg.Alias, pEntry->Info.InterfaceServiceName, pEntry->Cfg.Username,
@@ -1126,11 +1121,10 @@ Interface_SetParamBoolValue
                     /* start rp-pppoe */
                     snprintf(command, sizeof(command), "/usr/sbin/pppoe-start");
             #endif
+                
                 }
                 else if (pEntry->Cfg.LinkType == DML_PPPoE_LINK_TYPE)
                 {
-                    gain_root_privilege();
-		    bNonrootEnabled = true;
             #ifdef USE_PPP_DAEMON
                     snprintf(command, sizeof(command), "pppd -6 -c %s -i %s -u %s -p %s -f %s &",
                         pEntry->Cfg.Alias, PPPoE_VLAN_IF_NAME, pEntry->Cfg.Username, pEntry->Cfg.Password, auth_proto);
@@ -1162,12 +1156,7 @@ Interface_SetParamBoolValue
             {
                 CcspTraceInfo(("%s %d - Failed to start Pppmgr_StartPppdDaemon  %d\n", __FUNCTION__, __LINE__,
                             iErrorCode ));
-                if (bNonrootEnabled)
-                {
-                    init_capability();
-                    drop_root_caps(&appcaps);
-                    update_process_caps(&appcaps);
-                }
+
                 return FALSE;
             }
             /* lock while updating pid */
@@ -1191,16 +1180,9 @@ Interface_SetParamBoolValue
             DmlPppMgrGetWanMgrInstanceNumber(pEntry->Cfg.LowerLayers, &(pEntry->Cfg.WanInstanceNumber));
 
             CcspTraceInfo(("pid table value  '%d'\n", pEntry->Info.pppPid));
-	    if (bNonrootEnabled)
-	    {
-                init_capability();
-                drop_root_caps(&appcaps);
-                update_process_caps(&appcaps);
-	    }
         }
         else
         {
-            gain_root_privilege();
 #ifdef USE_PPP_DAEMON
             PppMgr_stopPppProcess(pEntry->Info.pppPid);
 #else
@@ -1209,9 +1191,6 @@ Interface_SetParamBoolValue
             sleep(5);	    
 #endif
             pEntry->Info.pppPid = 0;
-            init_capability();
-            drop_root_caps(&appcaps);
-            update_process_caps(&appcaps);
         }
 
         /* we are unlocking at end */
