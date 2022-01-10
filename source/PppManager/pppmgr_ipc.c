@@ -96,6 +96,11 @@ static char *pppStateNames[] =
 
 };
 
+struct UpdateWanManager_args{
+    INT WANInstance;
+    char LinkStatus[6];
+};
+
 /* ---------------------------------------------------------------------------
    This internal API will convert state to string
 ----------------------------------------------------------------------------*/
@@ -227,22 +232,20 @@ extern ANSC_STATUS PppMgr_closeIpcSocket(int32_t sockFd)
 #endif
 }
 
-/* --------------------------------------------------------------------
-Function : PppMgr_SetErrorStatus
-
-Decription: This API will set down state to wan manager IPCP status
------------------------------------------------------------------------*/
-static ANSC_STATUS PppMgr_SetErrorStatus(INT iWANInstance)
+static void* PppMgr_SetErrorStatus_Thread(void *arg)
 {
+    INT iWANInstance = (INT *) arg;
     char acSetParamName[DATAMODEL_PARAM_LENGTH] = { 0 };
     char acSetParamValue[DATAMODEL_PARAM_LENGTH] = { 0 };
+
+    pthread_detach(pthread_self());
 
     if(iWANInstance <= 0)
     {
         return ANSC_STATUS_FAILURE;
     }
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_IPCP_STATUS_PARAM_NAME, iWANInstance);
 
+    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_IPCP_STATUS_PARAM_NAME, iWANInstance);
     snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "Down");
 
     if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
@@ -250,8 +253,55 @@ static ANSC_STATUS PppMgr_SetErrorStatus(INT iWANInstance)
     {
         CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
     }
-    return ANSC_STATUS_SUCCESS;
 
+    pthread_exit(NULL);
+    return NULL;
+}
+
+/* --------------------------------------------------------------------
+Function : PppMgr_SetErrorStatus
+
+Decription: This API will set down state to wan manager IPCP status
+-----------------------------------------------------------------------*/
+static ANSC_STATUS PppMgr_SetErrorStatus(INT iWANInstance)
+{
+    pthread_t threadId;
+    INT iErrorCode;
+
+    /* Updating WanManager DM with PPP DML mutex lock creats mutex deadlock with WanManager DM mutex. Moving 
+       DM set to thread to avoid mutex deadlock */ 
+    iErrorCode = pthread_create( &threadId, NULL, &PppMgr_SetErrorStatus_Thread, (void*)iWANInstance );
+    if( 0 != iErrorCode )
+    {
+        CcspTraceInfo(("%s %d - Failed to start PppMgr_SetErrorStatus_Thread  EC:%d\n", __FUNCTION__, __LINE__, iErrorCode ));
+        return ANSC_STATUS_FAILURE;
+    }
+    return ANSC_STATUS_SUCCESS;
+}
+
+static void* PppMgr_SetIpv6ErrorStatus_Thread(void *arg)
+{
+    INT iWANInstance = (INT *) arg;
+    char acSetParamName[DATAMODEL_PARAM_LENGTH] = { 0 };
+    char acSetParamValue[DATAMODEL_PARAM_LENGTH] = { 0 };
+
+    pthread_detach(pthread_self());
+
+    if(iWANInstance <= 0)
+    {
+        return ANSC_STATUS_FAILURE;
+    }
+
+    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_IPV6CP_STATUS_PARAM_NAME, iWANInstance);
+    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "Down");
+
+    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
+                acSetParamValue, ccsp_string, FALSE ) == ANSC_STATUS_SUCCESS)
+    {
+        CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
+    }
+    pthread_exit(NULL);
+    return NULL;
 }
 
 /* --------------------------------------------------------------------
@@ -261,22 +311,17 @@ Decription: This API will set down state to wan manager IPV6CP
 -----------------------------------------------------------------------*/
 static ANSC_STATUS PppMgr_SetIpv6ErrorStatus(INT iWANInstance)
 {
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = { 0 };
-    char acSetParamValue[DATAMODEL_PARAM_LENGTH] = { 0 };
+    pthread_t threadId;
+    INT iErrorCode;
 
-    if(iWANInstance <= 0)
+    /* Updating WanManager DM with PPP DML mutex lock creats mutex deadlock with WanManager DM mutex. Moving 
+       DM set to thread to avoid mutex deadlock */ 
+    iErrorCode = pthread_create( &threadId, NULL, &PppMgr_SetIpv6ErrorStatus_Thread, (void*)iWANInstance );
+
+    if( 0 != iErrorCode )
     {
+        CcspTraceInfo(("%s %d - Failed to start PppMgr_SetIpv6ErrorStatus_Thread  EC:%d\n", __FUNCTION__, __LINE__, iErrorCode ));
         return ANSC_STATUS_FAILURE;
-    }
-
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_IPV6CP_STATUS_PARAM_NAME, iWANInstance);
-
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "Down");
-
-    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) == ANSC_STATUS_SUCCESS)
-    {
-        CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
     }
     return ANSC_STATUS_SUCCESS;
 }
@@ -398,6 +443,41 @@ static ANSC_STATUS PppMgr_DmlSetVendorParams(char *invendormsg , int *SRU , int 
     regfree(&regexCompiled);
 
     return ANSC_STATUS_SUCCESS;
+}
+
+static void* UpdateWanManagerThread(void *arg )
+{
+    struct UpdateWanManager_args *args = (struct UpdateWanManager_args *) arg;
+    char acSetParamName[DATAMODEL_PARAM_LENGTH] = { 0 };
+    char acSetParamValue[DATAMODEL_PARAM_LENGTH] = { 0 };
+
+    pthread_detach(pthread_self());
+
+    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_LCP_STATUS_PARAM_NAME, args->WANInstance);
+    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", args->LinkStatus);
+
+    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
+                acSetParamValue, ccsp_string, FALSE ) != ANSC_STATUS_SUCCESS)
+    {
+        CcspTraceInfo(("Failed set %s with value %s\n", acSetParamName, acSetParamValue));
+        return ANSC_STATUS_FAILURE;
+    }
+    CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
+
+    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_LINK_STATUS_PARAM_NAME, args->WANInstance);
+    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", args->LinkStatus);
+
+    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
+                acSetParamValue, ccsp_string, FALSE ) != ANSC_STATUS_SUCCESS)
+    {
+        CcspTraceInfo(("Failed set %s with value %s\n", acSetParamName, acSetParamValue));
+        return ANSC_STATUS_FAILURE;
+    }
+    CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
+
+    free(args);
+    pthread_exit(NULL);
+    return NULL;
 }
 
 /* --------------------------------------------------------------------
@@ -544,33 +624,21 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
         /* We don't have an up/down status to update wan mananager */
         return ANSC_STATUS_SUCCESS;
     }
+    /* Updating WanManager DM with PPP DML mutex lock creats mutex deadlock with WanManager DM mutex. Moving 
+       DM set to thread to avoid mutex deadlock */ 
 
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_LCP_STATUS_PARAM_NAME, iWANInstance);
+    pthread_t threadId;
+    INT iErrorCode;
+    struct UpdateWanManager_args *args = malloc(sizeof(struct UpdateWanManager_args));
+    args->WANInstance = iWANInstance;
+    strncpy(args->LinkStatus, WanPppLinkStatus, strlen(WanPppLinkStatus)+1);
 
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WanPppLinkStatus);
-
-    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) != ANSC_STATUS_SUCCESS)
+    iErrorCode = pthread_create( &threadId, NULL, &UpdateWanManagerThread, (void*)args );
+    if( 0 != iErrorCode )
     {
-        CcspTraceInfo(("Failed set %s with value %s\n", acSetParamName, acSetParamValue));
-
+        CcspTraceInfo(("%s %d - Failed to start UpdateWanManagerThread  EC:%d\n", __FUNCTION__, __LINE__, iErrorCode ));
         return ANSC_STATUS_FAILURE;
     }
-    CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
-
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_LINK_STATUS_PARAM_NAME, iWANInstance);
-
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WanPppLinkStatus);
-
-    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) != ANSC_STATUS_SUCCESS)
-    {
-        CcspTraceInfo(("Failed set %s with value %s\n", acSetParamName, acSetParamValue));
-
-        return ANSC_STATUS_FAILURE;
-    }
-    CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
-
     return ANSC_STATUS_SUCCESS;
 }
 
@@ -782,6 +850,7 @@ static ANSC_STATUS PppMgr_ProcessIpv6cpParams(PDML_PPP_IF_FULL pNewEntry, ipc_pp
     }
     else
     {
+        iWANInstance = pNewEntry->Cfg.WanInstanceNumber;
         PppMgr_SetIpv6ErrorStatus(iWANInstance);    
     }
 
