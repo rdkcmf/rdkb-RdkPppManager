@@ -38,6 +38,7 @@
 #include "pppmgr_dml_apis.h"
 #include "pppmgr_dml_ppp_apis.h"
 #include "ccsp_psm_helper.h"
+#include <syscfg/syscfg.h>
 
 #define PPP_IF_SERVICE_NAME "atm0.0.0.38"
 #define PPP_IF_NAME         "pppoa0"
