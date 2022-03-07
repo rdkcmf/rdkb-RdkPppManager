@@ -62,6 +62,7 @@
 /* wan manager params */
 #define WAN_NOE_PARAM_NAME    "Device.X_RDK_WanManager.CPEInterfaceNumberOfEntries"
 #define WAN_PHY_PATH_PARAM_NAME    "Device.X_RDK_WanManager.CPEInterface.%d.Phy.Path"
+#define WAN_IFACE_NAME             "Device.X_RDK_WanManager.CPEInterface.%d.Wan.Name"
 
 #define DATAMODEL_PARAM_LENGTH    256
 
@@ -110,7 +111,7 @@ ANSC_STATUS PppMgr_stopPppProcess( pid_t pid );
 ANSC_STATUS DmlWanmanagerSetParamValues( const char *pComponent, const char *pBus,
         const char *pParamName, const char *pParamVal, enum dataType_e type, unsigned int bCommitFlag );
 
-static ANSC_STATUS DmlPppMgrGetParamValues(char *pComponent, char *pBus, char *pParamName, char *pReturnVal);
+ANSC_STATUS DmlPppMgrGetParamValues(char *pComponent, char *pBus, char *pParamName, char *pReturnVal);
 
 ULONG GetUptimeinSeconds ();
 

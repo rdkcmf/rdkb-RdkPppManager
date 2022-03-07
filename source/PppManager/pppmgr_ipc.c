@@ -44,6 +44,16 @@
 
 #define PPP_MGR_IPC_SERVER    1
 #define GET_PPPID_ATTEMPT    5
+#define DHCPV6_PATH           "/etc/dibbler/%s/"
+#define DHCPV6_DUID_FILE      "client-duid"
+#define PROC_UUID_PATH        "/proc/sys/kernel/random/uuid"
+#define PHY_IF_MAC_PATH       "/sys/class/net/atm0/address"
+#if defined (DUID_UUID_ENABLE)
+#define DUID_TYPE "0004"  /* duid-type duid-uuid 4 */
+#else
+#define DUID_TYPE "00:03:"  /* duid-type duid-ll 3 */
+#define HW_TYPE "00:01:"    /* hw type is always 1 */
+#endif
 
 /* pppd exit status */
 #define PPP_EXIT_USER_REQUEST        5
@@ -111,6 +121,117 @@ static char* pppStatetoString(uint8_t state)
         return pppStateNames[state];
     }
     return pppStateNames[PPP_MAX_STATE];
+}
+
+
+/* ---------------------------------------------------------------------------
+   This internal API will get the DUID and save it to a file
+----------------------------------------------------------------------------*/
+static void PppMgr_GenerateDuidFile (char *wanName)
+{
+
+    char buff[256] = {0};
+
+    FILE *fd = NULL;
+
+#if defined (DUID_UUID_ENABLE)
+    memset(buff, 0, sizeof(buff));
+    if (syscfg_get(NULL, "UUID", uuid, sizeof(uuid)) != ANSC_STATUS_SUCCESS)
+    {
+        snprintf(buff, sizeof(buff), "cat %s | tr -d -", PROC_UUID_PATH);
+
+        fd = popen(buff, "r");
+        if(fd == NULL)
+        {
+            CcspTraceError(("%s %d: Failed to ger uuid entry\n", __FUNCTION__, __LINE__));
+            pclose(fd);
+            return;
+        }
+
+        fgets(uuid, sizeof(uuid), fd);
+        pclose(fd);
+
+        syscfg_set(NULL, "UUID", uuid);
+        syscfg_commit();
+    }
+#endif
+
+    // get mac from physical interface
+    char mac[64] = {0};
+
+    memset(mac, 0, sizeof(mac));
+
+    fd = fopen(PHY_IF_MAC_PATH, "r");
+    if(fd == NULL)
+    {
+        CcspTraceError(("%s %d:Failed to open mac address table\n", __FUNCTION__, __LINE__));
+        fclose(fd);
+        return;
+    }
+
+    fread(mac, sizeof(mac), 1, fd);
+    fclose(fd);
+
+    CcspTraceInfo(("%s %d: MAC of phyical interface is %s \n", __FUNCTION__, __LINE__, mac));
+
+    // get the dhcp config path
+
+    char file_path[256] = {0};
+    struct stat st = {0};
+
+    memset(file_path, 0, sizeof(file_path));
+
+    snprintf(file_path, sizeof(file_path), DHCPV6_PATH, wanName);
+
+    if (stat(file_path, &st) == -1)
+    {
+        // directory does not exists, so create it
+        mkdir(file_path, 0644);
+        CcspTraceInfo(("%s %d: created directory %s\n", __FUNCTION__, __LINE__, file_path));
+    }
+
+    strcat (file_path, DHCPV6_DUID_FILE);
+
+    // wite duid in duid-client file
+    FILE * fp_duid = fopen(file_path, "w");
+    if (fp_duid == NULL)
+    {
+        CcspTraceError(("%s %d: cannot open file:%s due to %s\n", __FUNCTION__, __LINE__, file_path, strerror(errno)))
+        return;
+    }
+
+    memset(buff, 0, sizeof(buff));
+
+    sprintf(buff, DUID_TYPE);
+#if defined (DUID_UUID_ENABLE)
+    sprintf(buff+4, uuid);
+#else
+    sprintf(buff+6, HW_TYPE);
+    sprintf(buff+12, mac);
+#endif
+    fprintf(fp_duid, "%s", buff);
+    fclose(fp_duid);
+
+}
+
+static void PppMgr_RemoveDuidFile (char *wanName)
+{
+
+    struct stat st = {0};
+    char file_path[256] = {0};
+
+
+    memset(file_path, 0, sizeof(file_path));
+
+    snprintf(file_path, sizeof(file_path), DHCPV6_PATH DHCPV6_DUID_FILE, wanName);
+
+    if (stat(file_path, &st) != -1)
+    {
+        // directory does not exists, so create it
+        CcspTraceInfo(("%s %d: deleting  %s\n", __FUNCTION__, __LINE__, file_path));
+        remove(file_path);
+    }
+
 }
 
 /* ---------------------------------------------------------------------------
@@ -829,6 +950,8 @@ static ANSC_STATUS PppMgr_ProcessIpv6cpParams(PDML_PPP_IF_FULL pNewEntry, ipc_pp
         /* set wan ipv6cp status */
         iWANInstance = pNewEntry->Cfg.WanInstanceNumber;
 
+        PppMgr_GenerateDuidFile(pNewEntry->Cfg.Alias);
+
         CcspTraceInfo(("%s %d WAN Instance:%d\n", __FUNCTION__, __LINE__, iWANInstance));
 
         snprintf(WanPppIpv6cpStatus, sizeof(WanPppIpv6cpStatus), "Up");
@@ -851,6 +974,7 @@ static ANSC_STATUS PppMgr_ProcessIpv6cpParams(PDML_PPP_IF_FULL pNewEntry, ipc_pp
     else
     {
         iWANInstance = pNewEntry->Cfg.WanInstanceNumber;
+        PppMgr_RemoveDuidFile(pNewEntry->Cfg.Alias);
         PppMgr_SetIpv6ErrorStatus(iWANInstance);    
     }
 
