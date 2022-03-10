@@ -39,8 +39,12 @@
 
 extern  ANSC_HANDLE bus_handle;
 extern char g_Subsystem[32];
+extern int sysevent_fd;
+extern token_t   sysevent_token;
 
 #define NET_STATS_FILE "/proc/net/dev"
+#define SYSEVENT_PPP_STATUS "ppp_status"
+#define PPPOE_PROC_FILE "/proc/net/pppoe"
 
 void get_wan_proto(wanProto_t * p_wan_proto)
 {
@@ -110,7 +114,7 @@ ULONG get_ppp_ip_addr(void)
     if (proto != PPPOE)
         return 0;
 
-    if (!commonSyseventGet("ppp_status", buf, sizeof(buf)))
+    if (sysevent_get(sysevent_fd, sysevent_token, SYSEVENT_PPP_STATUS, buf, sizeof(buf)) == 0)
     {
         if (strncmp(buf, "up", 2) != 0)
             return 0;
@@ -123,12 +127,48 @@ ULONG get_ppp_ip_addr(void)
     return 0;
 }
 
-int get_session_id(ULONG * p_id)
+int get_session_id(ULONG * p_id, ANSC_HANDLE hContext)
 {
 
-    FILE * fp;
+    FILE * fp = NULL;
     char buf[1024] = {0};
     char result[1024] = {0};
+    unsigned long id = 0L;
+    PDML_PPP_IF_FULL pEntry = (PDML_PPP_IF_FULL)hContext;
+    
+    if( p_id == NULL){
+       CcspTraceInfo(("%s %d - Invalid Pointer p_id\n", __FUNCTION__, __LINE__));
+       return 0;
+    }
+
+    if(pEntry->Cfg.LinkType == DML_PPPoE_LINK_TYPE)
+    {
+        if(fp = fopen(PPPOE_PROC_FILE, "r"))
+        {
+           /* Skip first line of /proc/net/pppoe */
+           /* Id Address Device */
+
+           while(fgets(buf, sizeof(buf)-1, fp))
+           {
+              id = 0L;
+
+              if(strstr(buf, "Id") )
+                 continue;
+
+              if(sscanf(buf, "%08X", &id) == 1)
+              {
+                 *p_id = ntohs(id);
+                 CcspTraceInfo(("PPP Session ID: %08X, %d \n", id, *p_id));
+              }
+           }
+           fclose(fp);
+        }
+    }
+
+    else if(pEntry->Cfg.LinkType == DML_PPPoA_LINK_TYPE)
+    {
+        char *p = NULL;
+        int  id = 0;
 
     /*session id is only valid when ppp0 link is up*/
     if (!get_ppp_ip_addr())
@@ -152,8 +192,8 @@ int get_session_id(ULONG * p_id)
         /*result stores the last line for pppd session id*/
         if (result[0])
         {
-            char * p = strstr(result, "PPP session is");
-            int    id = 0;
+            p = strstr(result, "PPP session is");
+            id = 0;
 
             if (p)
             {
@@ -164,7 +204,7 @@ int get_session_id(ULONG * p_id)
 
         fclose(fp);
     }
-
+    }
     return 0;
 
 }

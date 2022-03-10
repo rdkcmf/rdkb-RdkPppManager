@@ -314,8 +314,6 @@ int PppManagerDmlInit
 
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Interface_GetEntryCount",  Interface_GetEntryCount);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Interface_GetEntry",  Interface_GetEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Interface_AddEntry",  Interface_AddEntry);
-    pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Interface_DelEntry",  Interface_DelEntry);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Interface_GetParamBoolValue",  Interface_GetParamBoolValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Interface_GetParamUlongValue",  Interface_GetParamUlongValue);
     pPlugInfo->RegisterFunction(pPlugInfo->hContext, "Interface_GetParamStringValue",  Interface_GetParamStringValue);

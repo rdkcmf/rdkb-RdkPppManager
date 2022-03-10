@@ -52,13 +52,11 @@ limitations under the License.
         <objects>
           <object>
             <name>Interface</name>
-            <objectType>writableTable</objectType>
+            <objectType>staticTable</objectType>
             <maxInstance>128</maxInstance>
             <functions>
               <func_GetEntryCount>Interface_GetEntryCount</func_GetEntryCount>
               <func_GetEntry>Interface_GetEntry</func_GetEntry>
-              <func_AddEntry>Interface_AddEntry</func_AddEntry>
-              <func_DelEntry>Interface_DelEntry</func_DelEntry>
               <func_GetParamBoolValue>Interface_GetParamBoolValue</func_GetParamBoolValue>
               <func_GetParamUlongValue>Interface_GetParamUlongValue</func_GetParamUlongValue>
               <func_GetParamStringValue>Interface_GetParamStringValue</func_GetParamStringValue>
@@ -180,7 +178,7 @@ limitations under the License.
             </parameter>
             <parameter>
               <name>MaxMRUSize</name>
-              <type>unsignedInt[1:1540]</type>
+              <type>unsignedInt[1280:1500]</type>
               <syntax>uint32</syntax>
               <writable>true</writable>
             </parameter>
@@ -189,6 +187,16 @@ limitations under the License.
               <type>unsignedInt[1:1540]</type>
               <syntax>uint32</syntax>
               <notify>off</notify>
+            </parameter>
+            <parameter>
+              <name>X_T_ONLINE_DE_SRU</name>
+              <type>unsignedInt</type>
+              <syntax>uint32</syntax>
+            </parameter>
+            <parameter>
+              <name>X_T_ONLINE_DE_SRD</name>
+              <type>unsignedInt</type>
+              <syntax>uint32</syntax>
             </parameter>
             <parameter>
               <name>ConnectionTrigger</name>

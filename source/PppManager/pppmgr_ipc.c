@@ -35,6 +35,7 @@
 /* ---- Include Files ---------------------------------------- */
 #include <sys/un.h>
 #include <errno.h>
+#include <regex.h>
 #include "pppmgr_ssp_global.h"
 #include "pppmgr_dml_plugin_main_apis.h"
 #include "pppmgr_dml.h"
@@ -43,12 +44,19 @@
 
 #define PPP_MGR_IPC_SERVER    1
 #define GET_PPPID_ATTEMPT    5
+
+/* pppd exit status */
+#define PPP_EXIT_USER_REQUEST        5
+#define PPP_EXIT_PEER_AUTH_FAILED    11
+#define PPP_EXIT_IDLE_TIMEOUT        12
+#define PPP_EXIT_HANGUP              16
+#define PPP_EXIT_AUTH_TOPEER_FAILED  19
+
 /* ---- private Functions ------------------------------------ */
 static ANSC_STATUS PppMgr_createIpcSockFd( int32_t  *sockFd, uint32_t sockMode);
 static ANSC_STATUS  PppMgr_bindIpcSocket( int32_t sockFd);
 static void* PppMgr_IpcServerThread( void *arg );
 static ANSC_STATUS PppMgr_IpcServerInit();
-static PSINGLE_LINK_ENTRY PppMgr_DmlGetLinkEntry(pid_t pid, char *interface);
 static ANSC_STATUS PppMgr_DmlSetIp4Param (char * ipbuff, char * ipCharArr);
 static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_event_msg_t pppEventMsg);
 static ANSC_STATUS PppMgr_receiveIpcSocket(int32_t sockFd, char *msg, uint32_t *msgLen);
@@ -82,6 +90,7 @@ static char *pppStateNames[] =
     [PPP_IPCP_FAILED] = "PPP_IPCP_FAILED",
     [PPP_IPV6CP_COMPLETED] = "PPP_IPV6CP_COMPLETED",
     [PPP_IPV6CP_FAILED] = "PPP_IPV6CP_FAILED",
+    [PPP_LCP_AUTH_COMPLETED] = "PPP_LCP_AUTH_COMPLETED",
     [PPP_MAX_STATE] = "PPP_MAX_STATE"
 
 };
@@ -218,60 +227,6 @@ extern ANSC_STATUS PppMgr_closeIpcSocket(int32_t sockFd)
 }
 
 /* --------------------------------------------------------------------
-Function : PppMgr_SetErrorStatus
-
-Decription: This API will set down state to wan manager IPCP status
------------------------------------------------------------------------*/
-static ANSC_STATUS PppMgr_SetErrorStatus(INT iWANInstance)
-{
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = { 0 };
-    char acSetParamValue[DATAMODEL_PARAM_LENGTH] = { 0 };
-
-    if(iWANInstance <= 0)
-    {
-        return ANSC_STATUS_FAILURE;
-    }
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_IPCP_STATUS_PARAM_NAME, iWANInstance);
-
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "Down");
-
-    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) == ANSC_STATUS_SUCCESS)
-    {
-        CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
-    }
-    return ANSC_STATUS_SUCCESS;
-
-}
-
-/* --------------------------------------------------------------------
-Function : PppMgr_SetIpv6ErrorStatus
-
-Decription: This API will set down state to wan manager IPV6CP 
------------------------------------------------------------------------*/
-static ANSC_STATUS PppMgr_SetIpv6ErrorStatus(INT iWANInstance)
-{
-    char acSetParamName[DATAMODEL_PARAM_LENGTH] = { 0 };
-    char acSetParamValue[DATAMODEL_PARAM_LENGTH] = { 0 };
-
-    if(iWANInstance <= 0)
-    {
-        return ANSC_STATUS_FAILURE;
-    }
-
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_IPV6CP_STATUS_PARAM_NAME, iWANInstance);
-
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "Down");
-
-    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) == ANSC_STATUS_SUCCESS)
-    {
-        CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
-    }
-    return ANSC_STATUS_SUCCESS;
-}
-
-/* --------------------------------------------------------------------
 Function : PppMgr_StartIpcServer
 
 Decription: This API will start the IPC server
@@ -329,6 +284,68 @@ static ANSC_STATUS PppMgr_DmlSetIp4Param (char * ipbuff, char * ipCharArr)
 }
 
 /* --------------------------------------------------------------------
+Function : PppMgr_DmlSetVendorParams
+
+Decription: This API will set vendor parameters to data model
+-----------------------------------------------------------------------*/
+
+static ANSC_STATUS PppMgr_DmlSetVendorParams(char *invendormsg , int *SRU , int *SRD)
+{
+    char * source = NULL;
+    source = invendormsg;
+    char * regexString = "([A-Z]+)=([0-9]+)";
+    size_t maxMatches = 2; // No. of Strings matching pattern to extract
+    size_t maxGroups = 1;
+
+    regex_t regexCompiled;
+    regmatch_t groupArray[maxGroups];
+    unsigned int m;
+    char * cursor;
+
+    if(regcomp(&regexCompiled, regexString, REG_EXTENDED))
+    {
+        CcspTraceInfo(("%s %d Could not compile regex \n", __FUNCTION__, __LINE__));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    m = 0;
+    cursor = source; // pointing to beginning of string
+    for(m = 0; m < maxMatches; m ++)
+    {
+        if(regexec(&regexCompiled, cursor, maxGroups, groupArray, 0))
+            break;  // No more matches
+
+        unsigned int g = 0;
+        unsigned int offset = 0;
+        for(g = 0; g < maxGroups; g++)
+        {
+            if(groupArray[g].rm_so == (size_t)-1)
+                break;  // No more groups
+
+            if(g == 0)
+                offset = groupArray[g].rm_eo;
+
+            char cursorCopy[strlen(cursor) + 1];
+            strcpy(cursorCopy, cursor);
+            cursorCopy[groupArray[g].rm_eo] = 0;
+            char *ret;
+            if(ret = strstr(cursorCopy + groupArray[g].rm_so, "SRU="))
+            {
+		*SRU = strtol(ret+4, NULL, 10);
+            }
+            else if(ret = strstr(cursorCopy + groupArray[g].rm_so, "SRD="))
+            {
+                *SRD = strtol(ret+4, NULL, 10);
+            }
+        }
+        cursor += offset;
+    }
+    regfree(&regexCompiled);
+
+    return ANSC_STATUS_SUCCESS;
+}
+
+/* --------------------------------------------------------------------
 Function : PppMgr_ProcessStateChangedMsg
 
 Decription: This API will set ppp state when LCP state change message is received
@@ -341,6 +358,7 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
     INT instance_num = 0;
     INT iWANInstance = -1;
     uint32_t updatedParam = 0;
+    int ret = 0;
 
     CcspTraceInfo(("[%s-%d] - PID received %d\n", __FUNCTION__, __LINE__, pppEventMsg.pid));
 
@@ -377,6 +395,7 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
             pNewEntry->Info.Status = DML_IF_STATUS_Down;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Connecting;
             pNewEntry->Info.LastChange = GetUptimeinSeconds();
+            strncpy(pNewEntry->Cfg.ACName,pppEventMsg.event.pppLcpMsg.acname,sizeof(pNewEntry->Cfg.ACName));
             break;
 
         case PPP_INTERFACE_AUTHENTICATING:
@@ -386,8 +405,13 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
             break;
 
         case PPP_INTERFACE_UP:
+            if (strcmp(pppEventMsg.event.pppLcpMsg.neg_mtu, "0") != 0){
+                if(syscfg_set(NULL, "router_mtu", pppEventMsg.event.pppLcpMsg.neg_mtu) != 0) 
+                    CcspTraceInfo(("syscfg set mtu=%s is failed \n",pppEventMsg.event.pppLcpMsg.neg_mtu));
+            }
             pNewEntry->Info.Status = DML_IF_STATUS_Up;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Connected;
+            pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_NONE;
             snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Up");
             updatedParam = 1;
             pNewEntry->Info.LastChange = GetUptimeinSeconds();
@@ -401,11 +425,66 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
 
         case PPP_INTERFACE_DISCONNECTED:
         case PPP_INTERFACE_DOWN:
+            pNewEntry->Info.SRU = 0;
+            pNewEntry->Info.SRD = 0;
             pNewEntry->Info.Status = DML_IF_STATUS_Down;
             pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_Disconnected;
             snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Down");
             updatedParam = 1;
             pNewEntry->Info.LastChange = GetUptimeinSeconds();
+
+            switch(pppEventMsg.event.pppLcpMsg.exitStatus)
+            {
+                case PPP_EXIT_USER_REQUEST:
+                    pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_USER_DISCONNECT;
+                    break;
+                case PPP_EXIT_PEER_AUTH_FAILED:
+                case PPP_EXIT_AUTH_TOPEER_FAILED:
+                    pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_AUTHENTICATION_FAILURE;
+                    break;
+                case PPP_EXIT_HANGUP:
+                    pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_ISP_TIME_OUT;
+                    break;
+                default:
+                    pNewEntry->Info.LastConnectionError = DML_PPP_CONN_ERROR_UNKNOWN;
+                    break;
+            }
+
+            break;
+
+	case PPP_LCP_AUTH_COMPLETED:
+            pNewEntry->Info.SRU = 0;
+            pNewEntry->Info.SRD = 0;
+
+            if(strlen(pppEventMsg.event.pppLcpMsg.vendormsg) > 0)
+            {
+                ret = PppMgr_DmlSetVendorParams(pppEventMsg.event.pppLcpMsg.vendormsg,
+                (int *)&pNewEntry->Info.SRU, (int *)&pNewEntry->Info.SRD);
+
+                if(ret == ANSC_STATUS_FAILURE)
+                {
+                     CcspTraceInfo(("[%s-%d] Setting Vendor Params Falure%s\n", __FUNCTION__, __LINE__,
+                     pppEventMsg.event.pppLcpMsg.vendormsg));
+                }
+            }
+
+            if(strlen(pppEventMsg.event.pppLcpMsg.authproto) > 0)
+            {
+                CcspTraceInfo(("PPP Authentication Protocol: %s ", pppEventMsg.event.pppLcpMsg.authproto));
+                if(strcmp(pppEventMsg.event.pppLcpMsg.authproto, "PAP") == 0)
+                    pNewEntry->Info.AuthenticationProtocol = DML_PPP_AUTH_PAP;
+                else
+                    pNewEntry->Info.AuthenticationProtocol = DML_PPP_AUTH_CHAP;
+            }
+
+            break;
+
+        case PPP_INTERFACE_AUTH_FAILED:
+            pNewEntry->Info.Status = DML_IF_STATUS_Down;
+            pNewEntry->Info.ConnectionStatus = DML_PPP_CONN_STATUS_AuthenticationFailed;
+            snprintf(WanPppLinkStatus, sizeof(WanPppLinkStatus), "Down");
+            PppMgr_stopPppoe();
+            updatedParam = 1;
             break;
 
         default:
@@ -422,32 +501,6 @@ static ANSC_STATUS PppMgr_ProcessStateChangedMsg(PDML_PPP_IF_FULL pNewEntry, ipc
         /* We don't have an up/down status to update wan mananager */
         return ANSC_STATUS_SUCCESS;
     }
-
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_LCP_STATUS_PARAM_NAME, iWANInstance);
-
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WanPppLinkStatus);
-
-    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) != ANSC_STATUS_SUCCESS)
-    {
-        CcspTraceInfo(("Failed set %s with value %s\n", acSetParamName, acSetParamValue));
-
-        return ANSC_STATUS_FAILURE;
-    }
-    CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
-
-    snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_LINK_STATUS_PARAM_NAME, iWANInstance);
-
-    snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WanPppLinkStatus);
-
-    if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) != ANSC_STATUS_SUCCESS)
-    {
-        CcspTraceInfo(("Failed set %s with value %s\n", acSetParamName, acSetParamValue));
-
-        return ANSC_STATUS_FAILURE;
-    }
-    CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
 
     return ANSC_STATUS_SUCCESS;
 }
@@ -505,8 +558,6 @@ static ANSC_STATUS PppMgr_ProcessIpcpParams(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_
     {
         CcspTraceInfo(("[%s-%d] Network parameters are missing from client message\n", __FUNCTION__, __LINE__));
 
-        PppMgr_SetErrorStatus(iWANInstance);
-
         return ANSC_STATUS_FAILURE;
     }
     if (pppEventMsg.pppState == PPP_IPCP_COMPLETED)
@@ -517,8 +568,6 @@ static ANSC_STATUS PppMgr_ProcessIpcpParams(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_
             CcspTraceInfo(("[%s-%d] Setting Local IP Falure%s\n", __FUNCTION__, 
                         __LINE__, pppEventMsg.event.pppIpcpMsg.ip));
 
-            PppMgr_SetErrorStatus(iWANInstance);
-
             return ANSC_STATUS_FAILURE;
         }
         ret = PppMgr_DmlSetIp4Param(pppEventMsg.event.pppIpcpMsg.gateway, (char*)&pNewEntry->Info.RemoteIPAddress);
@@ -527,8 +576,6 @@ static ANSC_STATUS PppMgr_ProcessIpcpParams(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_
         {
             CcspTraceInfo(("[%s-%d] Setting Remote IP Falure%s\n", __FUNCTION__, __LINE__,
                         pppEventMsg.event.pppIpcpMsg.gateway));
-
-            PppMgr_SetErrorStatus(iWANInstance);
 
             return ANSC_STATUS_FAILURE;
         }
@@ -551,8 +598,6 @@ static ANSC_STATUS PppMgr_ProcessIpcpParams(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_
         {
             CcspTraceInfo((" DNS parsing failed in received message\n"));
 
-            PppMgr_SetErrorStatus(iWANInstance);
-
             return ANSC_STATUS_FAILURE;
         }
         /* Use a separate loop, otherwise strtok might fail */
@@ -570,21 +615,6 @@ static ANSC_STATUS PppMgr_ProcessIpcpParams(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_
 
         CcspTraceInfo(("%s %d WAN Instance:%d\n", __FUNCTION__, __LINE__, iWANInstance));
 
-        snprintf(WanPppIpcpStatus, sizeof(WanPppIpcpStatus), "Up");
-
-        snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_IPCP_STATUS_PARAM_NAME, iWANInstance);
-
-        snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WanPppIpcpStatus);
-
-        if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName, 
-                    acSetParamValue, ccsp_string, FALSE ) == ANSC_STATUS_SUCCESS)
-        {
-            CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
-        }
-    }
-    else
-    {
-        PppMgr_SetErrorStatus(iWANInstance);
     }
 
     return ANSC_STATUS_SUCCESS;
@@ -641,26 +671,6 @@ static ANSC_STATUS PppMgr_ProcessIpv6cpParams(PDML_PPP_IF_FULL pNewEntry, ipc_pp
 
         CcspTraceInfo(("%s %d WAN Instance:%d\n", __FUNCTION__, __LINE__, iWANInstance));
 
-        snprintf(WanPppIpv6cpStatus, sizeof(WanPppIpv6cpStatus), "Up");
-
-        snprintf(acSetParamName, DATAMODEL_PARAM_LENGTH, PPP_IPV6CP_STATUS_PARAM_NAME, iWANInstance);
-
-        snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WanPppIpv6cpStatus);
-
-        if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, 
-                    acSetParamName, acSetParamValue, ccsp_string, FALSE) == ANSC_STATUS_SUCCESS)
-        {
-            CcspTraceInfo(("Succefully set %s with value %s\n", acSetParamName, acSetParamValue));
-        }
-        // After ipv6cp dbus set is called, allow some seconds for wan manager to set ipv6 config variables  
-        // to avoid any race condition caused by next immediate dbus call for ipv4 status 
-        // Race condition will cause dibbler client to restart multiple times
-        // or causes stopping the dibbler client permanently due to misconfigured or overwritten ipv6 variables
-        sleep(5);
-    }
-    else
-    {
-        PppMgr_SetIpv6ErrorStatus(iWANInstance);    
     }
 
     return ANSC_STATUS_SUCCESS;
@@ -673,10 +683,9 @@ Decription: This API will process the message received from ppp client
 -----------------------------------------------------------------------*/
 static ANSC_STATUS PppMgr_ProcessIpcMsg(ipc_msg_payload_t ipcMsg)
 {
-    PSINGLE_LINK_ENTRY         pSLinkEntry             = NULL;
     PDATAMODEL_PPP             pMyObject               = (PDATAMODEL_PPP      )g_pBEManager->hPPP;
-    PPPP_IF_LINK_OBJECT        pLinkContext2           = (PPPP_IF_LINK_OBJECT)NULL;
-    PDML_PPP_IF_FULL           pEntry               = (PDML_PPP_IF_FULL    )NULL;
+    PDML_PPP_IF_FULL           pEntry               = (PDML_PPP_IF_FULL    )pMyObject->PppTable;
+
     ANSC_STATUS retStatus = ANSC_STATUS_SUCCESS;
     uint32_t getAttempt = 0;
 
@@ -691,29 +700,10 @@ static ANSC_STATUS PppMgr_ProcessIpcMsg(ipc_msg_payload_t ipcMsg)
         {
             sleep(1);
         }
-        pSLinkEntry = PppMgr_DmlGetLinkEntry(ipcMsg.data.pppEventMsg.pid, ipcMsg.data.pppEventMsg.interface);
     
         getAttempt++;
 
-    }while(pSLinkEntry == NULL && getAttempt < GET_PPPID_ATTEMPT);
-
-    if(pSLinkEntry == NULL)
-    {
-        CcspTraceInfo(("[%s-%d] - instance number not found \n", __FUNCTION__, __LINE__));
-
-        return ANSC_STATUS_FAILURE;
-    }
-
-    pLinkContext2 = ACCESS_PPP_IF_LINK_OBJECT(pSLinkEntry);
-
-    if(pLinkContext2 == NULL)
-    {
-        CcspTraceInfo(("[%s-%d] - cannot find  pLinkContext2\n  ", __FUNCTION__, __LINE__));
-
-        return ANSC_STATUS_FAILURE;
-    }
-
-    pEntry = (PDML_PPP_IF_FULL)pLinkContext2->hContext;
+    }while( getAttempt < GET_PPPID_ATTEMPT);
 
     if(pEntry == NULL)
     {
@@ -736,6 +726,7 @@ static ANSC_STATUS PppMgr_ProcessIpcMsg(ipc_msg_payload_t ipcMsg)
         case    PPP_INTERFACE_DISCONNECTED:
         case    PPP_INTERFACE_LCP_ECHO_FAILED:
         case    PPP_INTERFACE_AUTH_FAILED:
+        case    PPP_LCP_AUTH_COMPLETED:
 
             CcspTraceInfo(("[%s-%d] PPP_LCP_STATE_CHANGED message received\n", __FUNCTION__, __LINE__));
 
@@ -842,60 +833,4 @@ static ANSC_STATUS PppMgr_IpcServerInit()
     }
 
     return ANSC_STATUS_SUCCESS;
-}
-
-/* --------------------------------------------------------------------
-Function : PppGetInstanceNumber
-
-Decription: This API will return data model entry associated with ppp client pid value
------------------------------------------------------------------------*/
-static PSINGLE_LINK_ENTRY PppMgr_DmlGetLinkEntry(pid_t pid, char *interface)
-{
-
-    PSINGLE_LINK_ENTRY         pSLinkEntry             = NULL;
-    PDATAMODEL_PPP             pMyObject               = (PDATAMODEL_PPP      )g_pBEManager->hPPP;
-    PPPP_IF_LINK_OBJECT       pLinkContext2           = (PPPP_IF_LINK_OBJECT)NULL;
-    PDML_PPP_IF_FULL           pNewEntry               = (PDML_PPP_IF_FULL    )NULL;
-    int i = 0;
-
-    if(!pid)
-    {
-        CcspTraceInfo(("[%s-%d] pid is zero", __FUNCTION__, __LINE__));
-        return NULL;
-    }
-    pSLinkEntry = AnscSListGetFirstEntry(&pMyObject->IfList);
-
-    while ( pSLinkEntry )
-    {
-        pLinkContext2 = ACCESS_PPP_IF_LINK_OBJECT(pSLinkEntry);
-
-        pNewEntry = (PDML_PPP_IF_FULL)pLinkContext2->hContext;
-
-        if(pNewEntry)
-        {
-            pthread_mutex_lock(&pNewEntry->mDataMutex);
-
-            if ( pNewEntry->Info.pppPid == pid )
-            {
-                pthread_mutex_unlock(&pNewEntry->mDataMutex);
-
-                return pSLinkEntry;
-            }
-            else if (strncmp(pNewEntry->Cfg.Alias, interface, sizeof(pNewEntry->Cfg.Alias)) == 0)
-            {
-                /* The mapping using PID may not work in some cases. For eg, if pppd
-                restarts due to CHAP authentication failure etc. In this case, we should
-                try to map with interface name and update the PID information */
-                pNewEntry->Info.pppPid = PppMgr_getPppPid();
-                CcspTraceInfo(("[%s-%d] ppp daemon on %s interface may be restarted and updating new pid %d", __FUNCTION__, __LINE__, pNewEntry->Cfg.Alias, pNewEntry->Info.pppPid));
-                pthread_mutex_unlock(&pNewEntry->mDataMutex);
-                return pSLinkEntry;
-            }
-            pthread_mutex_unlock(&pNewEntry->mDataMutex);
-        }
-        pSLinkEntry   = AnscSListGetNextEntry(pSLinkEntry);
-    }
-
-    return NULL;
-
 }

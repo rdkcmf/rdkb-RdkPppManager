@@ -41,6 +41,6 @@ pppmanager_DEPENDENCIES= \
 
 pppmanager_CFLAGS = $(SYSTEMD_CFLAGS) $(NONROOT_CFLAGS)
 pppmanager_SOURCES = pppmgr_ssp_action.c pppmgr_ssp_main.c pppmgr_ssp_messagebus_interface.c pppmgr_ipc.c pppmgr_mgr.c
-pppmanager_LDFLAGS = -lccsp_common -ldl $(SYSTEMD_LDFLAGS) -lrdkloggers -lhal_platform -lnanomsg
+pppmanager_LDFLAGS = -lccsp_common -ldl $(SYSTEMD_LDFLAGS) -lrdkloggers -lhal_platform -lnanomsg -lsecure_wrapper
 pppmanager_LDADD =  $(pppmanager_DEPENDENCIES)
 

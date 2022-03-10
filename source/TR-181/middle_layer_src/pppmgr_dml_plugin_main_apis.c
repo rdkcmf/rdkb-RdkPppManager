@@ -171,11 +171,6 @@ BackEndManagerInitialize
 
     ANSC_STATUS                     returnStatus = ANSC_STATUS_SUCCESS;
     PBACKEND_MANAGER_OBJECT  pMyObject    = (PBACKEND_MANAGER_OBJECT)hThisObject;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFoDml     = (PPOAM_IREP_FOLDER_OBJECT)NULL;
-    PPOAM_IREP_FOLDER_OBJECT        pPoamIrepFoPPPIf    = (PPOAM_IREP_FOLDER_OBJECT)NULL;
-    PSLAP_VARIABLE                  pSlapVariable       = (PSLAP_VARIABLE          )NULL;
-    PDML_PPP_IF_FULL           pEntry              = (PDML_PPP_IF_FULL   )NULL;
-    PPPP_IF_LINK_OBJECT       pLinkObj        = (PPPP_IF_LINK_OBJECT)NULL;
     ULONG                           ulEntryCount        = 0;
     ULONG                           ulIndex             = 0;
     ULONG                           ulNextInsNum        = 0;
@@ -194,44 +189,26 @@ BackEndManagerInitialize
     }
 
     /* Initiation Device.PPP.Interface */
+    ulEntryCount = DmlGetTotalNoOfPPPInterfaces(NULL);
 
-    AnscSListInitializeHeader(&pPpp->IfList);
+    ulNextInsNum = 1;
 
-    pPpp->ulIfNextInstance = 1;
-
-    pPpp->hIrepFolderCOSA = g_GetRegistryRootFolder(g_pDslhDmlAgent);
-
-    pPoamIrepFoDml = (PPOAM_IREP_FOLDER_OBJECT)pPpp->hIrepFolderCOSA;
-    if ( !pPoamIrepFoDml )
+    for ( ulIndex = 0; ulIndex < ulEntryCount; ulIndex++ )
     {
-        return ANSC_STATUS_FAILURE;
-    }
+        PppDmlGetIfEntry(NULL, ulIndex, &pPpp->PppTable[ulIndex]);
 
-    pPoamIrepFoPPPIf =
-        (PPOAM_IREP_FOLDER_OBJECT)pPoamIrepFoDml->GetFolder
-        (
-         (ANSC_HANDLE)pPoamIrepFoDml,
-         IREP_FOLDER_NAME_PPPIF
-        );
+        if ( pPpp->PppTable[ulIndex].Cfg.InstanceNumber == 0 )
+        {
+            pPpp->PppTable[ulIndex].Cfg.InstanceNumber = ulNextInsNum;
 
-    if ( !pPoamIrepFoPPPIf )
-    {
-        pPoamIrepFoPPPIf =
-            pPoamIrepFoDml->AddFolder
-            (
-             (ANSC_HANDLE)pPoamIrepFoDml,
-             IREP_FOLDER_NAME_PPPIF,
-             0
-            );
-    }
+            PppDmlSetIfValues(NULL, ulIndex, ulNextInsNum, pPpp->PppTable[ulIndex].Cfg.Alias);
 
-    if ( !pPoamIrepFoPPPIf )
-    {
-        return ANSC_STATUS_FAILURE;
-    }
-    else
-    {
-        pPpp->hIrepFolderPPPIf = (ANSC_HANDLE)pPoamIrepFoPPPIf;
+            ulNextInsNum++;
+        }
+        else
+        {
+            ulNextInsNum = pPpp->PppTable[ulIndex].Cfg.InstanceNumber + 1;
+        }
     }
 
     return returnStatus;

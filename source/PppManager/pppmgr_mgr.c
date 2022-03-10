@@ -34,8 +34,27 @@
 /*------------------Include file---------------------------*/
 #include "pppmgr_ssp_global.h"
 
+/*-------------------declarations--------------------*/
+int       sysevent_fd = -1;
+token_t   sysevent_token;
+
 /*-------------------Extern declarations--------------------*/
 extern int PppManager_StartIpcServer();
+
+ /* * DmlPppSyseventInit() */
+static int DmlPppSyseventInit( void )
+{
+    char sysevent_ip[] = "127.0.0.1";
+    char sysevent_name[] = "pppmgr";
+
+    sysevent_fd =  sysevent_open( sysevent_ip, SE_SERVER_WELL_KNOWN_PORT, SE_VERSION, sysevent_name, &sysevent_token );
+
+    if ( sysevent_fd < 0 ){
+        return -1;
+    }
+
+    return 0;
+}
 
 ANSC_STATUS PppMgr_Init()
 {
@@ -52,6 +71,12 @@ ANSC_STATUS PppMgr_Init()
     if (syscfg_init() < 0)
     {
         CcspTraceError(("failed to initialise syscfg"));
+        return ANSC_STATUS_FAILURE;
+    }
+
+    // Initialize sysevent
+    if ( DmlPppSyseventInit( ) < 0 )
+    {
         return ANSC_STATUS_FAILURE;
     }
 
