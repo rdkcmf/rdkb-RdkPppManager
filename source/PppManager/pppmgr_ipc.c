@@ -370,7 +370,7 @@ static void* PppMgr_SetErrorStatus_Thread(void *arg)
     snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "Down");
 
     if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) == ANSC_STATUS_SUCCESS)
+                acSetParamValue, ccsp_string, TRUE ) == ANSC_STATUS_SUCCESS)
     {
         CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
     }
@@ -417,7 +417,7 @@ static void* PppMgr_SetIpv6ErrorStatus_Thread(void *arg)
     snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "Down");
 
     if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) == ANSC_STATUS_SUCCESS)
+                acSetParamValue, ccsp_string, TRUE ) == ANSC_STATUS_SUCCESS)
     {
         CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
     }
@@ -578,7 +578,7 @@ static void* UpdateWanManagerThread(void *arg )
     snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", args->LinkStatus);
 
     if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) != ANSC_STATUS_SUCCESS)
+                acSetParamValue, ccsp_string, TRUE ) != ANSC_STATUS_SUCCESS)
     {
         CcspTraceInfo(("Failed set %s with value %s\n", acSetParamName, acSetParamValue));
         return ANSC_STATUS_FAILURE;
@@ -589,7 +589,7 @@ static void* UpdateWanManagerThread(void *arg )
     snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", args->LinkStatus);
 
     if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName,
-                acSetParamValue, ccsp_string, FALSE ) != ANSC_STATUS_SUCCESS)
+                acSetParamValue, ccsp_string, TRUE ) != ANSC_STATUS_SUCCESS)
     {
         CcspTraceInfo(("Failed set %s with value %s\n", acSetParamName, acSetParamValue));
         return ANSC_STATUS_FAILURE;
@@ -888,7 +888,7 @@ static ANSC_STATUS PppMgr_ProcessIpcpParams(PDML_PPP_IF_FULL pNewEntry, ipc_ppp_
         snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WanPppIpcpStatus);
 
         if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, acSetParamName, 
-                    acSetParamValue, ccsp_string, FALSE ) == ANSC_STATUS_SUCCESS)
+                    acSetParamValue, ccsp_string, TRUE ) == ANSC_STATUS_SUCCESS)
         {
             CcspTraceInfo(("Successfully set %s with value %s\n", acSetParamName, acSetParamValue));
         }
@@ -961,7 +961,7 @@ static ANSC_STATUS PppMgr_ProcessIpv6cpParams(PDML_PPP_IF_FULL pNewEntry, ipc_pp
         snprintf(acSetParamValue, DATAMODEL_PARAM_LENGTH, "%s", WanPppIpv6cpStatus);
 
         if(DmlWanmanagerSetParamValues(WAN_COMPONENT_NAME, WAN_DBUS_PATH, 
-                    acSetParamName, acSetParamValue, ccsp_string, FALSE) == ANSC_STATUS_SUCCESS)
+                    acSetParamName, acSetParamValue, ccsp_string, TRUE) == ANSC_STATUS_SUCCESS)
         {
             CcspTraceInfo(("Succefully set %s with value %s\n", acSetParamName, acSetParamValue));
         }
