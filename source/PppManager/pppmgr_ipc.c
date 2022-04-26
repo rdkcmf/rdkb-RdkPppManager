@@ -269,8 +269,8 @@ static ANSC_STATUS  PppMgr_bindIpcSocket( int32_t sockFd)
 #if defined( _USE_NM_MSG_SOCK)
     if(nn_bind (sockFd, sockPort)  < 0)
     {
-        int errnum = errno;
-
+        CcspTraceError(("Error: nn_bind failed[%s] \n",nn_strerror(nn_errno ())));
+        nn_close(sockFd);
         return ANSC_STATUS_FAILURE;
     }
     return ANSC_STATUS_SUCCESS;
