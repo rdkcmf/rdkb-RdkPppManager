@@ -1184,13 +1184,23 @@ Interface_SetParamBoolValue
         }
         else
         {
+
+        // This is the section where we are stopping ppp daemon when a teardown case occurs
+        // Eg: Unplugging adsl line
 #ifdef USE_PPP_DAEMON
             PppMgr_stopPppProcess(pEntry->Info.pppPid);
 #else
+            CcspTraceInfo(("%s %d - Stopping ppp client\n", __FUNCTION__, __LINE__));
 	    system("/usr/sbin/pppoe-stop");
-            //Allow enough time for rp-pppoe to gracefully stop the daemon
-            sleep(5);	    
+            // instead of waiting for a fixed time period, check if ppp daemon is terminated or not
+            while(ANSC_STATUS_SUCCESS == PppMgr_checkPidExist(pEntry->Info.pppPid))
+            {
+                CcspTraceInfo(("%s %d - Waiting for pppd to terminate\n", __FUNCTION__, __LINE__, pEntry->Info.pppPid));
+                sleep(1);
+            }
 #endif
+            // At this point ppp daemon is terminated
+            CcspTraceInfo(("%s %d - pppd has been terminated\n", __FUNCTION__, __LINE__));
             pEntry->Info.pppPid = 0;
         }
 
