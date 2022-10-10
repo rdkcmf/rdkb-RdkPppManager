@@ -1067,6 +1067,7 @@ Interface_SetParamBoolValue
     pthread_t pppdThreadId;
     BOOL retStatus = FALSE;
     uint32_t getAttempts = 0;
+    uint32_t waitTime = 0;
 
     if(pEntry == NULL)
     {
@@ -1193,10 +1194,14 @@ Interface_SetParamBoolValue
             CcspTraceInfo(("%s %d - Stopping ppp client\n", __FUNCTION__, __LINE__));
 	    system("/usr/sbin/pppoe-stop");
             // instead of waiting for a fixed time period, check if ppp daemon is terminated or not
+            // wait for maximim 10 seconds in case the pppPid still exist in system
             while(ANSC_STATUS_SUCCESS == PppMgr_checkPidExist(pEntry->Info.pppPid))
             {
                 CcspTraceInfo(("%s %d - Waiting for pppd to terminate\n", __FUNCTION__, __LINE__, pEntry->Info.pppPid));
                 sleep(1);
+                waitTime++;
+                if(waitTime >= 10)
+                    break;
             }
 #endif
             // At this point ppp daemon is terminated
